@@ -29,6 +29,8 @@ func (d pgService) CreateTenant(ctx context.Context, tenantId, tenantName string
 		return
 	}
 
+	// TODO: do the least usage of db connection list
+
 	var writer = d.conn.Writer()
 
 	var connections = model.Connections{}
@@ -43,20 +45,12 @@ func (d pgService) CreateTenant(ctx context.Context, tenantId, tenantName string
 	}
 
 	var tenant = &model.Tenant{}
-	err = writer.QueryContext(ctx, tenant, sqlCreateTenant, tenantId, tenantName)
+	err = writer.QueryContext(ctx, tenant, sqlCreateTenant, tenantId, tenantName, connInfo.ID)
 	if err != nil {
 		return
 	}
 
-	connection, exist := d.connectionById[tenant.ConnectionId]
-	if exist && connection != nil {
-		return
-	}
-
-	connection, err = establishConnection(tenant, connInfo)
-	if err == nil {
-		d.connectionById[connInfo.ID] = connection
-	}
+	connection, err = d.getOrCreateConnectionOfTenant(ctx, tenant)
 	return
 }
 
@@ -85,24 +79,7 @@ func (d pgService) GetTenant(ctx context.Context, tenantId string) (connection C
 		return
 	}
 
-	connection, exist := d.connectionById[tenant.ConnectionId]
-	if exist && connection != nil {
-		return
-	}
-
-	// if connection in connection is not established, establish connection to db now!
-	var connInfo = &model.Connection{}
-	err = reader.QueryContext(ctx, connInfo, sqlGetConnectionById, tenant.ConnectionId)
-	if err != nil {
-		return
-	}
-
-	conn, err := establishConnection(tenant, connInfo)
-	if err != nil {
-		return
-	}
-
-	d.connectionById[connInfo.ID] = conn
+	connection, err = d.getOrCreateConnectionOfTenant(ctx, tenant)
 	return
 }
 
@@ -125,8 +102,60 @@ func (d pgService) GetTenantImmigration(ctx context.Context, tenantId string) (i
 		span.Finish()
 	}()
 
-	m := migration.NewPostgres(d.conn, tenantId, d.migrates)
+	tenantId, err = SanitizeTenantId(ctx, tenantId)
+	if err != nil {
+		return
+	}
+
+	var reader = d.conn.Reader()
+
+	var tenant = &model.Tenant{}
+	err = reader.QueryContext(ctx, tenant, sqlGetTenantByID, tenantId)
+	if err != nil {
+		return
+	}
+
+	if tenant.ID == "" {
+		err = fmt.Errorf("tenant id %s is not found", tenantId)
+		return
+	}
+
+	connection, err := d.getOrCreateConnectionOfTenant(ctx, tenant)
+	if err != nil {
+		return
+	}
+
+	m := migration.NewPostgres(connection.SQL(), tenantId, d.migrates)
 	return m, nil
+}
+
+func (d pgService) getOrCreateConnectionOfTenant(ctx context.Context, tenant *model.Tenant) (connection Connection, err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "getOrCreateConnectionOfTenant")
+	defer func() {
+		ctx.Done()
+		span.Finish()
+	}()
+
+	connection, exist := d.connectionById[tenant.ConnectionId]
+	if exist && connection != nil {
+		return
+	}
+
+	var reader = d.conn.Reader()
+
+	// if connection in connection is not established, establish connection to db now!
+	var connInfo = &model.Connection{}
+	err = reader.QueryContext(ctx, connInfo, sqlGetConnectionById, tenant.ConnectionId)
+	if err != nil {
+		return
+	}
+
+	connection, err = establishConnection(ctx, tenant, connInfo)
+	if err == nil && connection != nil {
+		d.connectionById[connInfo.ID] = connection
+	}
+
+	return
 }
 
 func Postgres(conn db.SQL, migrates []migration.Migrate) (service Service, err error) {
