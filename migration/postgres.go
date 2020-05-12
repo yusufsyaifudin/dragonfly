@@ -16,16 +16,12 @@ type postgres struct {
 func (p postgres) Status(ctx context.Context) *CurrentStatus {
 	var tenantID = p.tenantId
 
+	// order ascending by sequence number
 	var appliedMigrations = make([]*ModelMigration, 0)
 	err := p.master.QueryContext(ctx, &appliedMigrations, fmt.Sprintf(sqlGetMigrationData, tenantID, tenantID))
 	if err != nil {
 		return &CurrentStatus{}
 	}
-
-	// order ascending by sequence number
-	sort.SliceStable(appliedMigrations, func(i, j int) bool {
-		return appliedMigrations[i].SequenceNumber < appliedMigrations[j].SequenceNumber
-	})
 
 	lastApplied := appliedMigrations[len(appliedMigrations)-1]
 	if lastApplied == nil {
@@ -43,15 +39,34 @@ func (p postgres) Status(ctx context.Context) *CurrentStatus {
 func (p postgres) Sync(ctx context.Context) error {
 	var tenantID = p.tenantId
 
+	// order ascending by sequence number
+	var migrations = p.migration
+	sort.SliceStable(migrations, func(i, j int) bool {
+		return migrations[i].SequenceNumber(ctx) < migrations[j].SequenceNumber(ctx)
+	})
+
 	var appliedMigrations = make([]*ModelMigration, 0)
 	err := p.master.QueryContext(ctx, &appliedMigrations, fmt.Sprintf(sqlGetMigrationData, tenantID, tenantID))
 	if err != nil {
 		return err
 	}
 
-	var appliedMigrationById = make(map[string]bool)
+	if len(appliedMigrations) > len(migrations) {
+		return fmt.Errorf("some applied migration in database is not found in list of migration")
+	}
+
+	var candidateMigration = make(map[string]bool, 0)
+	for _, m := range migrations {
+		candidateMigration[m.ID(ctx)] = true
+	}
+
+	var appliedMigrationById = make(map[string]*ModelMigration)
 	for _, m := range appliedMigrations {
-		appliedMigrationById[m.ID] = true
+		if _, exist := candidateMigration[m.ID]; !exist {
+			return fmt.Errorf("migration %s is not registred in migration list", m.ID)
+		}
+
+		appliedMigrationById[m.ID] = m
 	}
 
 	type up struct {
@@ -60,10 +75,21 @@ func (p postgres) Sync(ctx context.Context) error {
 		query       string
 	}
 
-	// TODO: detect anomalies, when order in input data is not same as order in applied migration database
 	var candidateUp = make([]up, 0)
-	for _, m := range p.migration {
-		if ok, exist := appliedMigrationById[m.ID(ctx)]; ok && exist {
+	for _, m := range migrations {
+		id := m.ID(ctx)
+		seqNum := m.SequenceNumber(ctx)
+
+		if v, exist := appliedMigrationById[id]; exist {
+			// detect anomalies, when sequence number in input data is not same as order in applied migration database
+			if v.SequenceNumber != seqNum {
+				return fmt.Errorf("%s is registered with sequence %d but applied with sequence %d",
+					v.ID,
+					seqNum,
+					v.SequenceNumber,
+				)
+			}
+
 			continue
 		}
 
@@ -73,8 +99,8 @@ func (p postgres) Sync(ctx context.Context) error {
 		}
 
 		candidateUp = append(candidateUp, up{
-			id:          m.ID(ctx),
-			sequenceNum: m.SequenceNumber(ctx),
+			id:          id,
+			sequenceNum: seqNum,
 			query:       sql,
 		})
 	}
@@ -84,17 +110,12 @@ func (p postgres) Sync(ctx context.Context) error {
 		return nil
 	}
 
-	// order ascending by sequence number
-	sort.SliceStable(candidateUp, func(i, j int) bool {
-		return candidateUp[i].sequenceNum < candidateUp[j].sequenceNum
-	})
-
 	tx, err := p.master.Begin()
 	if err != nil {
 		return err
 	}
 
-	err = tx.ExecContext(ctx, fmt.Sprintf(sqlCreateMigrationTable, tenantID, tenantID))
+	err = tx.ExecContext(ctx, fmt.Sprintf(sqlCreateMigrationTable, tenantID, tenantID, tenantID, tenantID, tenantID))
 	if err != nil {
 		_ = tx.Rollback()
 		return err

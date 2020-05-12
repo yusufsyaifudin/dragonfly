@@ -8,6 +8,8 @@ const (
 		sequence_number INT NOT NULL,
 		applied_at TIMESTAMP WITH TIMEZONE NOT NULL DEFAULT now()
 	);
+
+	CREATE UNIQUE INDEX IF NOT EXISTS unique_%s_migrations_seq_num ON %s.%s_migrations (sequence_number);
 `
 
 	// select all applied migration
