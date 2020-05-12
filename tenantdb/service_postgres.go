@@ -10,6 +10,10 @@ import (
 	"github.com/opentracing/opentracing-go"
 )
 
+var (
+	ErrNoConnectionList = fmt.Errorf("connections list is empty, could not select one")
+)
+
 // pgService implements Service using Postgres as main database to save all tenant data and it's connection info.
 type pgService struct {
 	migrates       []migration.Migrate
@@ -36,6 +40,11 @@ func (d pgService) CreateTenant(ctx context.Context, tenantId, tenantName string
 	var connections = model.Connections{}
 	err = writer.QueryContext(ctx, &connections, sqlGetConnections)
 	if err != nil {
+		return
+	}
+
+	if len(connections) <= 0 {
+		err = ErrNoConnectionList
 		return
 	}
 

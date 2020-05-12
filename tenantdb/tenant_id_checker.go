@@ -50,6 +50,16 @@ var lowercaseAlphabetChars = map[rune]bool{
 	'z': true,
 }
 
+var (
+	// Postgres schema name maximum is 63 character
+	// https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS
+	ErrTenantIdLength = fmt.Errorf("tenant id must have at least 5 characters and maximum 20 characters")
+
+	ErrTenantIdPrefix = fmt.Errorf("first 3 characters on tenant id must not be number")
+
+	ErrTenantIdNotPermittedChars = fmt.Errorf("tenant id contains unpermitted character")
+)
+
 // SanitizeTenantId validate tenantId and sanitize it
 func SanitizeTenantId(ctx context.Context, tenantId string) (newId string, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "SanitizeTenantId")
@@ -60,8 +70,9 @@ func SanitizeTenantId(ctx context.Context, tenantId string) (newId string, err e
 
 	tenantId = strings.TrimSpace(tenantId)
 
-	if len(tenantId) <= 5 {
-		err = fmt.Errorf("tenant id must have at least 5 characters")
+	length := len(tenantId)
+	if length <= 5 || length > 20 {
+		err = ErrTenantIdLength
 		return
 	}
 
@@ -75,7 +86,7 @@ func SanitizeTenantId(ctx context.Context, tenantId string) (newId string, err e
 
 		if i >= 0 && i <= 2 {
 			if isNumber {
-				err = fmt.Errorf("first 3 characters on tenant id must not be number")
+				err = ErrTenantIdPrefix
 				return
 			}
 		}
@@ -86,7 +97,7 @@ func SanitizeTenantId(ctx context.Context, tenantId string) (newId string, err e
 	}
 
 	if str.String() != tenantId {
-		return "", fmt.Errorf("tenant id contains unpermitted character")
+		return "", ErrTenantIdNotPermittedChars
 	}
 
 	return str.String(), nil
