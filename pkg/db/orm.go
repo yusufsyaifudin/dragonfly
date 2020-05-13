@@ -8,6 +8,7 @@ import (
 type SQL interface {
 	Writer() SQLWriter
 	Reader() SQLReader
+	Close() error
 }
 
 // SQLWriter is a common interface for pg.DB and pg.Tx types.

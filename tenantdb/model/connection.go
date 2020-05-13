@@ -4,7 +4,7 @@ type Connection struct {
 	ID                         string
 	PostgresMasterDebug        bool
 	PostgresMasterHost         string
-	PostgresMasterPort         string
+	PostgresMasterPort         int
 	PostgresMasterUsername     string
 	PostgresMasterPassword     string
 	PostgresMasterDatabase     string

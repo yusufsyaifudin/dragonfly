@@ -7,6 +7,8 @@ import (
 	"ysf/dragonfly/pkg/db"
 	"ysf/dragonfly/tenantdb/model"
 
+	"github.com/pkg/errors"
+
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -52,9 +54,12 @@ func (d pgService) CreateTenant(ctx context.Context, tenantId, tenantName string
 	for _, conn := range connections {
 		connInfo = conn
 	}
-
 	var tenant = &model.Tenant{}
-	err = writer.QueryContext(ctx, tenant, sqlCreateTenant, tenantId, tenantName, connInfo.ID)
+	_ = writer.QueryContext(ctx, tenant, sqlGetTenantByID, tenantId)
+	if tenant.ID == "" {
+		err = writer.QueryContext(ctx, tenant, sqlCreateTenant, tenantId, tenantName, connInfo.ID)
+	}
+
 	if err != nil {
 		return
 	}
@@ -134,7 +139,12 @@ func (d pgService) GetTenantImmigration(ctx context.Context, tenantId string) (i
 		return
 	}
 
-	m := migration.NewPostgres(connection.SQL(), tenantId, d.migrates)
+	conn := connection.SQL()
+	if conn == nil {
+		return migration.NewNoopImmigration(), fmt.Errorf("connection to sql is nil")
+	}
+
+	m := migration.NewImmigrationPostgres(conn, tenantId, d.migrates)
 	return m, nil
 }
 
@@ -165,6 +175,22 @@ func (d pgService) getOrCreateConnectionOfTenant(ctx context.Context, tenant *mo
 	}
 
 	return
+}
+
+func (d pgService) Close() error {
+	var err error
+	for _, c := range d.connectionById {
+		if c.SQL() == nil {
+			continue
+		}
+
+		sqlErr := c.SQL().Close()
+		if sqlErr != nil {
+			err = errors.Wrapf(err, sqlErr.Error())
+		}
+	}
+
+	return err
 }
 
 func Postgres(conn db.SQL, migrates []migration.Migrate) (service Service, err error) {

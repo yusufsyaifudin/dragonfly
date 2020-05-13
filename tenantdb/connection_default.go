@@ -12,23 +12,23 @@ type defaultConnection struct {
 	sql        db.SQL
 }
 
-func (d defaultConnection) TenantInfo() *model.Tenant {
+func (d *defaultConnection) TenantInfo() *model.Tenant {
 	return d.tenantInfo
 }
 
-func (d defaultConnection) ConnectionInfo() *model.Connection {
+func (d *defaultConnection) ConnectionInfo() *model.Connection {
 	return d.connInfo
 }
 
-func (d defaultConnection) SQL() db.SQL {
+func (d *defaultConnection) SQL() db.SQL {
 	return d.sql
 }
 
-func (d defaultConnection) setSQL(sql db.SQL) {
+func (d *defaultConnection) setSQL(sql db.SQL) {
 	d.sql = sql
 }
 
-func (d defaultConnection) Redis() {
+func (d *defaultConnection) Redis() {
 	panic("implement me")
 }
 

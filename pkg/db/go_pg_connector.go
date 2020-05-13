@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -10,10 +11,24 @@ import (
 	"github.com/go-pg/pg/v9"
 )
 
-// connectorGoPgWriter using go-pg connection
-func connectorGoPgWriter(conf Conf) SQLWriter {
+type closer struct {
+	conn *pg.DB
+}
+
+func (c closer) Close() error {
+	return c.conn.Close()
+}
+
+func newCloser(conn *pg.DB) io.Closer {
+	return &closer{
+		conn: conn,
+	}
+}
+
+// connectorGoPg using go-pg connection
+func connectorGoPg(conf Conf) (*goPgDbWrapperToIFace, io.Closer, error) {
 	ormPgDB := pg.Connect(&pg.Options{
-		Addr:               fmt.Sprintf("%s:%s", conf.Host, conf.Port),
+		Addr:               fmt.Sprintf("%s:%d", conf.Host, conf.Port),
 		User:               conf.Username,
 		Password:           conf.Password,
 		Database:           conf.Database,
@@ -30,7 +45,7 @@ func connectorGoPgWriter(conf Conf) SQLWriter {
 	return &goPgDbWrapperToIFace{
 		conf: conf,
 		db:   ormPgDB,
-	}
+	}, newCloser(ormPgDB), nil
 }
 
 type goPgDbWrapperToIFace struct {

@@ -6,7 +6,7 @@ type Conf struct {
 	Debug        bool   `json:"debug"`
 	AppName      string `json:"app_name"`
 	Host         string `json:"host"`
-	Port         string `json:"port"`
+	Port         int    `json:"port"`
 	Username     string `json:"username"`
 	Password     string `json:"password"`
 	Database     string `json:"database"`

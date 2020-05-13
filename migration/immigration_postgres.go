@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"ysf/dragonfly/pkg/db"
+
+	"github.com/opentracing/opentracing-go"
 )
 
 type postgres struct {
@@ -14,11 +16,17 @@ type postgres struct {
 }
 
 func (p postgres) Status(ctx context.Context) *CurrentStatus {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Status")
+	defer func() {
+		ctx.Done()
+		span.Finish()
+	}()
+
 	var tenantID = p.tenantId
 
 	// order ascending by sequence number
 	var appliedMigrations = make([]*ModelMigration, 0)
-	err := p.master.QueryContext(ctx, &appliedMigrations, fmt.Sprintf(sqlGetMigrationData, tenantID, tenantID))
+	err := p.master.QueryContext(ctx, &appliedMigrations, fmt.Sprintf(sqlGetMigrationData, tenantID))
 	if err != nil {
 		return &CurrentStatus{}
 	}
@@ -36,7 +44,19 @@ func (p postgres) Status(ctx context.Context) *CurrentStatus {
 	}
 }
 
+// Sync do migration to specific postgres schema.
+// Time complexity: O(3 + 2N) where
+// 3 is minimum query to create schema, create migration table, and get applied migration
+// 2 is fixed number when we sync up the migration. For example, when we do create users table,
+// it will first create the table in the selected schema and then insert the record to applied migrations data.
+// N is variable, the number of migration file to be sync.
 func (p postgres) Sync(ctx context.Context) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Sync")
+	defer func() {
+		ctx.Done()
+		span.Finish()
+	}()
+
 	var tenantID = p.tenantId
 
 	// order ascending by sequence number
@@ -45,13 +65,32 @@ func (p postgres) Sync(ctx context.Context) error {
 		return migrations[i].SequenceNumber(ctx) < migrations[j].SequenceNumber(ctx)
 	})
 
-	var appliedMigrations = make([]*ModelMigration, 0)
-	err := p.master.QueryContext(ctx, &appliedMigrations, fmt.Sprintf(sqlGetMigrationData, tenantID, tenantID))
+	tx, err := p.master.Begin()
 	if err != nil {
 		return err
 	}
 
+	err = tx.ExecContext(ctx, fmt.Sprintf(sqlCreatePostgresSchema, tenantID))
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	err = tx.ExecContext(ctx, fmt.Sprintf(sqlCreateMigrationTable, tenantID, tenantID, tenantID))
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	var appliedMigrations = make([]*ModelMigration, 0)
+	err = tx.QueryContext(ctx, &appliedMigrations, fmt.Sprintf(sqlGetMigrationData, tenantID))
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
 	if len(appliedMigrations) > len(migrations) {
+		_ = tx.Rollback()
 		return fmt.Errorf("some applied migration in database is not found in list of migration")
 	}
 
@@ -63,6 +102,7 @@ func (p postgres) Sync(ctx context.Context) error {
 	var appliedMigrationById = make(map[string]*ModelMigration)
 	for _, m := range appliedMigrations {
 		if _, exist := candidateMigration[m.ID]; !exist {
+			_ = tx.Rollback()
 			return fmt.Errorf("migration %s is not registred in migration list", m.ID)
 		}
 
@@ -81,9 +121,12 @@ func (p postgres) Sync(ctx context.Context) error {
 		seqNum := m.SequenceNumber(ctx)
 
 		if v, exist := appliedMigrationById[id]; exist {
-			// detect anomalies, when sequence number in input data is not same as order in applied migration database
+			// detect anomalies, when sequence number in input data is not same as order
+			// in applied migration database
 			if v.SequenceNumber != seqNum {
-				return fmt.Errorf("%s is registered with sequence %d but applied with sequence %d",
+				_ = tx.Rollback()
+				return fmt.Errorf(
+					"%s is registered with sequence %d but applied with sequence %d",
 					v.ID,
 					seqNum,
 					v.SequenceNumber,
@@ -95,6 +138,7 @@ func (p postgres) Sync(ctx context.Context) error {
 
 		sql, err := m.Up(ctx, tenantID)
 		if err != nil {
+			_ = tx.Rollback()
 			return err
 		}
 
@@ -107,18 +151,8 @@ func (p postgres) Sync(ctx context.Context) error {
 
 	// if no migration to be synced, then early return without error
 	if len(candidateUp) <= 0 {
+		_ = tx.Commit()
 		return nil
-	}
-
-	tx, err := p.master.Begin()
-	if err != nil {
-		return err
-	}
-
-	err = tx.ExecContext(ctx, fmt.Sprintf(sqlCreateMigrationTable, tenantID, tenantID, tenantID, tenantID, tenantID))
-	if err != nil {
-		_ = tx.Rollback()
-		return err
 	}
 
 	for _, m := range candidateUp {
@@ -128,7 +162,7 @@ func (p postgres) Sync(ctx context.Context) error {
 			return err
 		}
 
-		err = tx.ExecContext(ctx, fmt.Sprintf(sqlInsertMigrationData, tenantID, tenantID), m.id, m.sequenceNum)
+		err = tx.ExecContext(ctx, fmt.Sprintf(sqlInsertMigrationData, tenantID), m.id, m.sequenceNum)
 		if err != nil {
 			_ = tx.Rollback()
 			return err
@@ -138,7 +172,7 @@ func (p postgres) Sync(ctx context.Context) error {
 	return tx.Commit()
 }
 
-func NewPostgres(conn db.SQL, tenantId string, migration []Migrate) Immigration {
+func NewImmigrationPostgres(conn db.SQL, tenantId string, migration []Migrate) Immigration {
 	return &postgres{
 		master:    conn.Writer(),
 		tenantId:  tenantId,

@@ -47,6 +47,7 @@ var lowercaseAlphabetChars = map[rune]bool{
 	'v': true,
 	'w': true,
 	'x': true,
+	'y': true,
 	'z': true,
 }
 
@@ -71,7 +72,7 @@ func SanitizeTenantId(ctx context.Context, tenantId string) (newId string, err e
 	tenantId = strings.TrimSpace(tenantId)
 
 	length := len(tenantId)
-	if length <= 5 || length > 20 {
+	if length < 5 || length > 20 {
 		err = ErrTenantIdLength
 		return
 	}

@@ -10,15 +10,15 @@ import (
 	"go.uber.org/zap"
 )
 
-var ormDB = NewGoPGDBTest()
+var ormDB = newGoPGDBTest()
 var z, _ = zap.NewDevelopment()
 
 func TestGoPGDBLogger(t *testing.T) {
-	convey.Convey("GoPGDBLogger", t, func() {
-		convey.Convey("Debug is not active, so return immediately", func() {
-			dbLogger := &GoPGDBLogger{
-				Debug:     false,
-				ZapLogger: z,
+	convey.Convey("goPGDBLogger", t, func() {
+		convey.Convey("debug is not active, so return immediately", func() {
+			dbLogger := &goPGDBLogger{
+				debug:     false,
+				zapLogger: z,
 			}
 
 			ctx := context.Background()
@@ -42,10 +42,10 @@ func TestGoPGDBLogger(t *testing.T) {
 			convey.So(err, convey.ShouldBeNil)
 		})
 
-		convey.Convey("Debug is active, error occurred because no query passed in event query", func() {
-			dbLogger := &GoPGDBLogger{
-				Debug:     true,
-				ZapLogger: z,
+		convey.Convey("debug is active, error occurred because no query passed in event query", func() {
+			dbLogger := &goPGDBLogger{
+				debug:     true,
+				zapLogger: z,
 			}
 
 			ctx := context.Background()
@@ -69,11 +69,11 @@ func TestGoPGDBLogger(t *testing.T) {
 			convey.So(err, convey.ShouldNotBeNil)
 		})
 
-		convey.Convey("Debug is active, SELECT 1", func() {
+		convey.Convey("debug is active, SELECT 1", func() {
 
-			dbLogger := &GoPGDBLogger{
-				Debug:     true,
-				ZapLogger: z,
+			dbLogger := &goPGDBLogger{
+				debug:     true,
+				zapLogger: z,
 			}
 
 			ctx := context.Background()
@@ -97,10 +97,10 @@ func TestGoPGDBLogger(t *testing.T) {
 			convey.So(err, convey.ShouldBeNil)
 		})
 
-		convey.Convey("Debug is active, Other query is success with args", func() {
-			dbLogger := &GoPGDBLogger{
-				Debug:     true,
-				ZapLogger: z,
+		convey.Convey("debug is active, Other query is success with args", func() {
+			dbLogger := &goPGDBLogger{
+				debug:     true,
+				zapLogger: z,
 			}
 
 			ctx := context.Background()

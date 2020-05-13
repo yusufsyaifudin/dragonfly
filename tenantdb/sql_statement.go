@@ -7,10 +7,10 @@ const (
 	// same postgres master. You can also add redis cluster here
 	sqlCreateConnectionTable = `
 CREATE TABLE IF NOT EXISTS connections (
-	id UUID NOT NULL DEFAULT uuid_v4() PRIMARY KEY,
+	id UUID NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
 	postgres_master_debug BOOL NOT NULL DEFAULT true,
-	postgres_master_host VARCHAR NOT NULL DEFAULT '',
-	postgres_master_port VARCHAR NOT NULL DEFAULT '',
+	postgres_master_host VARCHAR NOT NULL DEFAULT 'localhost',
+	postgres_master_port INT NOT NULL DEFAULT 5432,
 	postgres_master_username VARCHAR NOT NULL DEFAULT '',
 	postgres_master_password VARCHAR NOT NULL DEFAULT '',
 	postgres_master_database VARCHAR NOT NULL DEFAULT '',
@@ -27,11 +27,11 @@ CREATE TABLE IF NOT EXISTS tenants (
 	id VARCHAR NOT NULL PRIMARY KEY,
 	name VARCHAR NOT NULL DEFAULT '',
 	connection_id UUID NOT NULL CONSTRAINT tenants_connection_id_foreign REFERENCES connections(id) ON UPDATE CASCADE ON DELETE RESTRICT,
-	created_at TIMESTAMP WITH TIMEZONE NOT NULL DEFAULT now(),
-	updated_at TIMESTAMP WITH TIMEZONE NOT NULL DEFAULT now()
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+	updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS unique_idx_tenants_qualifier_id ON tenants (qualifier_id);
+CREATE UNIQUE INDEX IF NOT EXISTS unique_idx_tenants_id ON tenants (id);
 
 COMMENT ON COLUMN tenants.id IS 'useful for creating postgres schema and table prefix, so it will not be conflict with another tenant in same db';
 `

@@ -13,13 +13,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// GoPGDBLogger Logger for go db
-type GoPGDBLogger struct {
-	Debug     bool
-	ZapLogger *zap.Logger
+// goPGDBLogger Logger for go db
+type goPGDBLogger struct {
+	debug     bool
+	zapLogger *zap.Logger
 }
 
-func (l *GoPGDBLogger) BeforeQuery(ctx context.Context, e *pg.QueryEvent) (context.Context, error) {
+func (l *goPGDBLogger) BeforeQuery(ctx context.Context, e *pg.QueryEvent) (context.Context, error) {
 	if ctx == nil {
 		ctx = e.DB.Context()
 	}
@@ -34,7 +34,7 @@ func (l *GoPGDBLogger) BeforeQuery(ctx context.Context, e *pg.QueryEvent) (conte
 		span.Finish()
 	}()
 
-	if !l.Debug {
+	if !l.debug {
 		return ctx, nil
 	}
 
@@ -55,7 +55,7 @@ func (l *GoPGDBLogger) BeforeQuery(ctx context.Context, e *pg.QueryEvent) (conte
 	return ctx, nil
 }
 
-func (l *GoPGDBLogger) AfterQuery(ctx context.Context, e *pg.QueryEvent) error {
+func (l *goPGDBLogger) AfterQuery(ctx context.Context, e *pg.QueryEvent) error {
 	if ctx == nil {
 		ctx = e.DB.Context()
 	}
@@ -70,7 +70,7 @@ func (l *GoPGDBLogger) AfterQuery(ctx context.Context, e *pg.QueryEvent) error {
 		span.Finish()
 	}()
 
-	if !l.Debug {
+	if !l.debug {
 		return nil
 	}
 
@@ -83,8 +83,8 @@ func (l *GoPGDBLogger) AfterQuery(ctx context.Context, e *pg.QueryEvent) error {
 	st := e.StartTime
 	elapsedTime := float64(time.Since(st).Nanoseconds()) / float64(1000000) // in ms
 
-	if l.Debug {
-		l.ZapLogger.Info(
+	if l.debug {
+		l.zapLogger.Info(
 			"DBQuery",
 			zap.Float64("elapsed_time", elapsedTime),
 			zap.String("query", query),

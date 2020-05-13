@@ -36,8 +36,9 @@ func (n noopSql) Reader() SQLReader {
 	return &noopWriter{}
 }
 
-type noopSql struct {
-}
+type noopSql struct{}
+
+func (n noopSql) Close() error { return nil }
 
 func NewNoop() SQL {
 	return &noopSql{}
