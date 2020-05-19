@@ -102,3 +102,10 @@ func (l *goPGDBLogger) AfterQuery(ctx context.Context, e *pg.QueryEvent) error {
 
 	return nil
 }
+
+func NewLogger(debug bool, log *zap.Logger) *goPGDBLogger {
+	return &goPGDBLogger{
+		zapLogger: log,
+		debug:     debug,
+	}
+}

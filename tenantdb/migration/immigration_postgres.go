@@ -77,7 +77,7 @@ func (p postgres) Sync(ctx context.Context) error {
 	var appliedMigrations = make([]*ModelMigration, 0)
 	err := p.master.QueryContext(ctx, &appliedMigrations, queries.String())
 	if err != nil {
-		return err
+		return fmt.Errorf("error get migration data: %s", err.Error())
 	}
 
 	if len(appliedMigrations) > len(migrations) {

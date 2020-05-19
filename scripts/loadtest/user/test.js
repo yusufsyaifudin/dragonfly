@@ -1,9 +1,9 @@
 import http from 'k6/http';
-import { check, group } from "k6";
-import { Rate, Counter, Trend } from "k6/metrics";
+import { check } from "k6";
+import { Rate, Counter } from "k6/metrics";
 
-export let errorTrx = new Counter("Error Transaction"); // Counter untuk Error/Failed Trx
-export let errorRate = new Rate("Error Rate")
+export let errorTrx = new Counter("Error Transaction"); // Counter for Error non 200 HTTP code
+export let errorRate = new Rate("Error Rate");
 
 function makeid(length) {
     var result           = '';
@@ -24,11 +24,10 @@ export default function() {
 
     //parse and check response
     let checkRes = check(hit2, {
-        "Status is 200": (r) => r.status === 200,
-        "Content is OK": JSON.parse(hit2.body).type === 'Tenant'
+        "Status is 200": (r) => r.status === 200
     });
 
-    if (JSON.parse(hit2.body).type !== 'Tenant') {
+    if (hit2.status !== 200) {
         console.log(hit2.body)
     }
 

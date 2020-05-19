@@ -28,7 +28,7 @@ type pgService struct {
 	connectionById map[string]Connection // connection id -> connection
 }
 
-func (d pgService) CreateTenant(ctx context.Context, tenantId, tenantName string) (connection Connection, err error) {
+func (d *pgService) CreateTenant(ctx context.Context, tenantId, tenantName string) (tenant *model.Tenant, connection Connection, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "CreateTenant")
 	defer func() {
 		ctx.Done()
@@ -39,8 +39,6 @@ func (d pgService) CreateTenant(ctx context.Context, tenantId, tenantName string
 	if err != nil {
 		return
 	}
-
-	// TODO: do the least usage of db connection list
 
 	var writer = d.conn.Writer()
 
@@ -59,7 +57,8 @@ func (d pgService) CreateTenant(ctx context.Context, tenantId, tenantName string
 	for _, conn := range connections {
 		connInfo = conn
 	}
-	var tenant = &model.Tenant{}
+
+	tenant = &model.Tenant{}
 	_ = writer.QueryContext(ctx, tenant, fmt.Sprintf(sqlGetTenantByID, d.prefix), tenantId)
 	if tenant.ID == "" {
 		err = writer.QueryContext(ctx, tenant, fmt.Sprintf(sqlCreateTenant, d.prefix), tenantId, tenantName, connInfo.ID)
@@ -69,11 +68,16 @@ func (d pgService) CreateTenant(ctx context.Context, tenantId, tenantName string
 		return
 	}
 
+	if tenant.ID == "" {
+		err = fmt.Errorf("cannot create tenant")
+		return
+	}
+
 	connection, err = d.getOrCreateConnectionOfTenant(ctx, tenant)
 	return
 }
 
-func (d pgService) GetTenant(ctx context.Context, tenantId string) (connection Connection, err error) {
+func (d *pgService) GetTenant(ctx context.Context, tenantId string) (tenant *model.Tenant, connection Connection, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "GetTenant")
 	defer func() {
 		ctx.Done()
@@ -85,10 +89,8 @@ func (d pgService) GetTenant(ctx context.Context, tenantId string) (connection C
 		return
 	}
 
-	var reader = d.conn.Reader()
-
-	var tenant = &model.Tenant{}
-	err = reader.QueryContext(ctx, tenant, fmt.Sprintf(sqlGetTenantByID, d.prefix), tenantId)
+	tenant = &model.Tenant{}
+	err = d.conn.Writer().QueryContext(ctx, tenant, fmt.Sprintf(sqlGetTenantByID, d.prefix), tenantId)
 	if err != nil {
 		return
 	}
@@ -102,7 +104,7 @@ func (d pgService) GetTenant(ctx context.Context, tenantId string) (connection C
 	return
 }
 
-func (d pgService) GetTenants(ctx context.Context) (tenants model.Tenants, err error) {
+func (d *pgService) GetTenants(ctx context.Context) (tenants model.Tenants, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "GetTenants")
 	defer func() {
 		ctx.Done()
@@ -114,7 +116,7 @@ func (d pgService) GetTenants(ctx context.Context) (tenants model.Tenants, err e
 	return
 }
 
-func (d pgService) GetTenantImmigration(ctx context.Context, tenantId string) (immigration migration.Immigration, err error) {
+func (d *pgService) GetTenantImmigration(ctx context.Context, tenantId string) (immigration migration.Immigration, err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "GetTenantImmigration")
 	defer func() {
 		ctx.Done()
@@ -126,11 +128,10 @@ func (d pgService) GetTenantImmigration(ctx context.Context, tenantId string) (i
 		return
 	}
 
-	var reader = d.conn.Reader()
-
 	var tenant = &model.Tenant{}
-	err = reader.QueryContext(ctx, tenant, fmt.Sprintf(sqlGetTenantByID, d.prefix), tenantId)
+	err = d.conn.Writer().QueryContext(ctx, tenant, fmt.Sprintf(sqlGetTenantByID, d.prefix), tenantId)
 	if err != nil {
+		err = fmt.Errorf("error get tenant from db: %s", err.Error())
 		return
 	}
 
@@ -141,6 +142,7 @@ func (d pgService) GetTenantImmigration(ctx context.Context, tenantId string) (i
 
 	connection, err := d.getOrCreateConnectionOfTenant(ctx, tenant)
 	if err != nil {
+		err = fmt.Errorf("error get or create connection of tenant: %s", err.Error())
 		return
 	}
 
@@ -151,38 +153,7 @@ func (d pgService) GetTenantImmigration(ctx context.Context, tenantId string) (i
 	return migration.NewImmigrationPostgres(connection.SQL(), fmt.Sprintf("%s_%s", d.prefix, tenantId), d.migrates)
 }
 
-func (d pgService) getOrCreateConnectionOfTenant(ctx context.Context, tenant *model.Tenant) (connection Connection, err error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "getOrCreateConnectionOfTenant")
-	defer func() {
-		ctx.Done()
-		span.Finish()
-	}()
-
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-	connection, exist := d.connectionById[tenant.ConnectionId]
-	if exist && connection != nil {
-		return
-	}
-
-	var reader = d.conn.Reader()
-
-	// if connection in connection is not established, establish connection to db now!
-	var connInfo = &model.Connection{}
-	err = reader.QueryContext(ctx, connInfo, fmt.Sprintf(sqlGetConnectionById, d.prefix), tenant.ConnectionId)
-	if err != nil {
-		return
-	}
-
-	connection, err = establishConnection(ctx, tenant, connInfo)
-	if err == nil && connection != nil {
-		d.connectionById[connInfo.ID] = connection
-	}
-
-	return
-}
-
-func (d pgService) Close() error {
+func (d *pgService) Close() error {
 	var err error
 	for _, c := range d.connectionById {
 		if c.SQL() == nil {

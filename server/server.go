@@ -113,6 +113,7 @@ func (s *server) init() {
 			zap.String("path", eCtx.Path()),
 			zap.Float64("latency", latency),
 			zap.Any("req_body", reqBodyObj),
+			zap.Int("resp_status", eCtx.Response().Status),
 			zap.Any("resp_body", respBodyObj),
 		)
 	}))

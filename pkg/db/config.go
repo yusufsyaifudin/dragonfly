@@ -11,8 +11,6 @@ type Conf struct {
 	Password     string `json:"password"`
 	Database     string `json:"database"`
 	PoolSize     int    `json:"pool_size"`
-	IdleTimeout  int    `json:"idle_timeout"`
-	MaxConnAge   int    `json:"max_conn_age"`
 	ReadTimeout  int    `json:"read_timeout"`
 	WriteTimeout int    `json:"write_timeout"`
 }

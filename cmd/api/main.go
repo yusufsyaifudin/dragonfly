@@ -24,11 +24,9 @@ const (
 	pgUser         = "postgres"
 	pgPassword     = "postgres"
 	pgDB           = "dragonfly"
-	pgPool         = 10
-	pgIdleTimeout  = 3000  // 3 seconds
-	pgMaxConnAge   = 60000 // 60 seconds
-	pgReadTimeout  = 1000  // 1 seconds
-	pgWriteTimeout = 2000  // 2 seconds
+	pgPool         = 30
+	pgReadTimeout  = 1000 // 1 seconds
+	pgWriteTimeout = 2000 // 2 seconds
 
 	appPrefix = "app"
 )
@@ -54,8 +52,6 @@ func main() {
 		Password:     pgPassword,
 		Database:     pgDB,
 		PoolSize:     pgPool,
-		IdleTimeout:  pgIdleTimeout,
-		MaxConnAge:   pgMaxConnAge,
 		ReadTimeout:  pgReadTimeout,
 		WriteTimeout: pgWriteTimeout,
 	}
@@ -99,8 +95,8 @@ func main() {
 	srv := server.NewServer(server.Config{
 		EnableProfiling: true,
 		ListenAddress:   ":2222",
-		WriteTimeout:    1 * time.Second,
-		ReadTimeout:     1 * time.Second,
+		WriteTimeout:    3 * time.Second,
+		ReadTimeout:     3 * time.Second,
 		ZapLogger:       zapLogger,
 		OpenTracing:     nil,
 	})

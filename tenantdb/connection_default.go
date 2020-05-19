@@ -7,13 +7,8 @@ import (
 )
 
 type defaultConnection struct {
-	tenantInfo *model.Tenant
-	connInfo   *model.Connection
-	sql        db.SQL
-}
-
-func (d *defaultConnection) TenantInfo() *model.Tenant {
-	return d.tenantInfo
+	connInfo *model.Connection
+	sql      db.SQL
 }
 
 func (d *defaultConnection) ConnectionInfo() *model.Connection {
@@ -32,15 +27,9 @@ func (d *defaultConnection) Redis() {
 	panic("implement me")
 }
 
-func newConnection(tenantInfo *model.Tenant, connInfo *model.Connection) (connector *defaultConnection, err error) {
+func newConnection(connInfo *model.Connection) (connector *defaultConnection, err error) {
 	connector = &defaultConnection{
-		tenantInfo: tenantInfo,
-		connInfo:   connInfo,
-	}
-
-	if tenantInfo == nil {
-		err = fmt.Errorf("cannot create connection, tenant info is nil")
-		return
+		connInfo: connInfo,
 	}
 
 	if connInfo == nil {

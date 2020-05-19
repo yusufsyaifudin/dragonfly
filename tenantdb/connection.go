@@ -7,7 +7,6 @@ import (
 
 // Connection real connection to specific tenant
 type Connection interface {
-	TenantInfo() *model.Tenant
 	ConnectionInfo() *model.Connection
 	SQL() db.SQL
 	Redis()

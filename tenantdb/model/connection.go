@@ -9,8 +9,6 @@ type Connection struct {
 	PostgresMasterPassword     string
 	PostgresMasterDatabase     string
 	PostgresMasterPoolSize     int
-	PostgresMasterIdleTimeout  int
-	PostgresMasterMaxConnAge   int
 	PostgresMasterReadTimeout  int
 	PostgresMasterWriteTimeout int
 }

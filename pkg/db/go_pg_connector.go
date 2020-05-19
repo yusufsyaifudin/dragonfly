@@ -5,6 +5,8 @@ import (
 	"io"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/go-pg/pg/v9"
 )
 
@@ -34,10 +36,20 @@ func connectorGoPgWriter(conf Conf) (SQLWriter, io.Closer, error) {
 		WriteTimeout:       time.Duration(conf.WriteTimeout) * time.Millisecond,
 		PoolSize:           conf.PoolSize,
 		MinIdleConns:       10,
-		MaxConnAge:         time.Duration(conf.MaxConnAge) * time.Millisecond,
-		IdleTimeout:        time.Duration(conf.IdleTimeout) * time.Millisecond,
-		IdleCheckFrequency: 1 * time.Second,
+		MaxConnAge:         5 * time.Minute,
+		IdleTimeout:        5 * time.Minute,
+		IdleCheckFrequency: 1 * time.Minute,
 	})
+
+	zapLogger, err := zap.NewDevelopment(
+		zap.AddCaller(),
+		zap.AddCallerSkip(3),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ormPgDB.AddQueryHook(NewLogger(true, zapLogger))
 
 	writer, err := newGoPgWriter(conf, ormPgDB)
 	if err != nil {

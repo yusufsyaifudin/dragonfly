@@ -15,8 +15,6 @@ CREATE TABLE IF NOT EXISTS %s_connections (
 	postgres_master_password VARCHAR NOT NULL DEFAULT '',
 	postgres_master_database VARCHAR NOT NULL DEFAULT '',
 	postgres_master_pool_size INT NOT NULL DEFAULT 10,
-	postgres_master_idle_timeout INT NOT NULL DEFAULT 300000, -- 5 minutes
-	postgres_master_max_conn_age INT NOT NULL DEFAULT 300000, -- 5 minutes
 	postgres_master_read_timeout INT NOT NULL DEFAULT 1000,
 	postgres_master_write_timeout INT NOT NULL DEFAULT 1000
 );

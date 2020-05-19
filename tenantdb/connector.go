@@ -2,6 +2,7 @@ package tenantdb
 
 import (
 	"context"
+	"fmt"
 	"ysf/dragonfly/pkg/db"
 	"ysf/dragonfly/tenantdb/model"
 
@@ -9,14 +10,18 @@ import (
 )
 
 // establishConnection establish new connection based on connection info
-func establishConnection(ctx context.Context, tenant *model.Tenant, connInfo *model.Connection) (Connection, error) {
+func establishConnection(ctx context.Context, connInfo *model.Connection) (Connection, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "establishConnection")
 	defer func() {
 		ctx.Done()
 		span.Finish()
 	}()
 
-	conn, err := newConnection(tenant, connInfo)
+	if connInfo == nil {
+		return nil, fmt.Errorf("connection info is nil")
+	}
+
+	conn, err := newConnection(connInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -31,8 +36,6 @@ func establishConnection(ctx context.Context, tenant *model.Tenant, connInfo *mo
 		Password:     connInfo.PostgresMasterPassword,
 		Database:     connInfo.PostgresMasterDatabase,
 		PoolSize:     connInfo.PostgresMasterPoolSize,
-		IdleTimeout:  connInfo.PostgresMasterIdleTimeout,
-		MaxConnAge:   connInfo.PostgresMasterMaxConnAge,
 		ReadTimeout:  connInfo.PostgresMasterReadTimeout,
 		WriteTimeout: connInfo.PostgresMasterWriteTimeout,
 	}
