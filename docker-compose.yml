@@ -1,0 +1,29 @@
+# Use postgres/postgres for user/password credentials
+version: '3.1'
+
+services:
+
+  postgres:
+    image: postgres:12-alpine
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    ports:
+      - 5433:5432
+
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: always
+    ## you can change pgAdmin default username/password with below environment variables
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin
+      PGADMIN_DEFAULT_PASSWORD: admin
+    volumes:
+      - ./pgdata:/root/.pgadmin
+    ports:
+      - 5050:80
+    depends_on:
+      - postgres

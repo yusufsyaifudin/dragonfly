@@ -37,8 +37,28 @@ func wrapEcho(h Handler) echo.HandlerFunc {
 		if err != nil {
 			span.SetTag("error", fmt.Sprintf("error while writing response body %s", err.Error()))
 
-			err = eCtx.JSON(http.StatusTeapot, map[string]interface{}{})
+			err = eCtx.JSON(http.StatusTeapot, ReplyStructure{
+				Error: &ReplyErrorStructure{
+					Code:    fmt.Sprintf("HTTP_%d", http.StatusTeapot),
+					Title:   "Response writing error",
+					Message: fmt.Sprintf("error while writing response body %s", err.Error()),
+				},
+				Type: ReplyError,
+				Data: nil,
+			})
 			return err
+		}
+
+		if body == nil || len(body) <= 0 {
+			return eCtx.JSON(http.StatusUnprocessableEntity, ReplyStructure{
+				Error: &ReplyErrorStructure{
+					Code:    fmt.Sprintf("HTTP_%d", http.StatusUnprocessableEntity),
+					Title:   "Response body is nil",
+					Message: "Sorry, we're about writing response body, but this error come to rescue.",
+				},
+				Type: ReplyError,
+				Data: nil,
+			})
 		}
 
 		span.LogFields(log.String("response", string(body)))
@@ -91,7 +111,15 @@ func stoppingRequest(stopped bool) echo.MiddlewareFunc {
 			// check if server is shutting down
 			// if it's the case then don't receive anymore requests
 			if stopped {
-				err := eCtx.JSON(http.StatusLocked, map[string]interface{}{})
+				err := eCtx.JSON(http.StatusLocked, ReplyStructure{
+					Error: &ReplyErrorStructure{
+						Code:    fmt.Sprintf("HTTP_%d", http.StatusLocked),
+						Title:   "Server is shutting down",
+						Message: "server is on command to gracefully shutdown",
+					},
+					Type: ReplyError,
+					Data: nil,
+				})
 
 				eCtx.Response().Writer.Header().Add("Content-Type", ContentTypeJSON)
 				eCtx.Response().Writer.Header().Add("X-Trace-Id", traceID)

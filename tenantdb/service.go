@@ -2,7 +2,7 @@ package tenantdb
 
 import (
 	"context"
-	"ysf/dragonfly/migration"
+	"ysf/dragonfly/tenantdb/migration"
 	"ysf/dragonfly/tenantdb/model"
 )
 

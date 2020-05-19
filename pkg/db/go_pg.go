@@ -9,14 +9,14 @@ import (
 // NewConnectionGoPG will create new connection for selected package.
 func NewConnectionGoPG(config Config) (sql SQL, err error) {
 	writerConf := config.Master
-	writerConn, writerCloser, err := connectorGoPg(writerConf)
+	writerConn, writerCloser, err := connectorGoPgWriter(writerConf)
 	if err != nil {
 		return
 	}
 
 	var slaves = make([]slaveMap, 0)
 	for _, slaveConf := range config.Slaves {
-		readerConn, readerCloser, readerErr := connectorGoPg(slaveConf)
+		readerConn, readerCloser, readerErr := connectorGoPgWriter(slaveConf)
 		if readerErr != nil {
 			err = readerErr
 			return

@@ -35,7 +35,15 @@ type server struct {
 func (s *server) init() {
 	echo.NotFoundHandler = func(c echo.Context) error {
 		// render your 404 page
-		return c.JSON(http.StatusOK, map[string]interface{}{})
+		return c.JSON(http.StatusNotFound, ReplyStructure{
+			Error: &ReplyErrorStructure{
+				Code:    fmt.Sprintf("HTTP_%d", http.StatusNotFound),
+				Title:   "Path Not Found",
+				Message: fmt.Sprintf("path %s not found", c.Path()),
+			},
+			Type: ReplyError,
+			Data: nil,
+		})
 	}
 
 	// init echo server
@@ -52,7 +60,15 @@ func (s *server) init() {
 			// Based on content length
 			limit, _ := bytes.Parse("500KB")
 			if eCtx.Request().ContentLength > limit {
-				_ = eCtx.JSON(http.StatusRequestEntityTooLarge, map[string]interface{}{})
+				_ = eCtx.JSON(http.StatusRequestEntityTooLarge, ReplyStructure{
+					Error: &ReplyErrorStructure{
+						Code:    fmt.Sprintf("HTTP_%d", http.StatusRequestEntityTooLarge),
+						Title:   "Request Entity Too Large",
+						Message: "entity too large",
+					},
+					Type: ReplyError,
+					Data: nil,
+				})
 
 				return false
 			}
@@ -120,6 +136,7 @@ func (s *server) RegisterRoutes(routes []*Route) {
 // Start will start the server
 func (s *server) Start() error {
 	for _, r := range s.routes {
+
 		// register middleware then define routes
 		m := ChainMiddleware(r.Middleware...)
 
@@ -131,7 +148,8 @@ func (s *server) Start() error {
 			s.e.Add(http.MethodDelete, r.Path, wrapEcho(m(r.Handler)))
 
 		case http.MethodGet:
-			s.e.Add(http.MethodGet, r.Path, wrapEcho(m(r.Handler)))
+
+			s.e.GET(r.Path, wrapEcho(m(r.Handler)))
 
 		case http.MethodHead:
 			s.e.Add(http.MethodHead, r.Path, wrapEcho(m(r.Handler)))

@@ -3,6 +3,7 @@ module ysf/dragonfly
 go 1.14
 
 require (
+	github.com/go-pg/pg v8.0.6+incompatible // indirect
 	github.com/go-pg/pg/v9 v9.1.6
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/labstack/echo-contrib v0.9.0

@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sort"
@@ -65,32 +66,21 @@ func (p postgres) Sync(ctx context.Context) error {
 		return migrations[i].SequenceNumber(ctx) < migrations[j].SequenceNumber(ctx)
 	})
 
-	tx, err := p.master.Begin()
-	if err != nil {
-		return err
-	}
+	var queries = bytes.Buffer{}
+	defer queries.Reset()
 
-	err = tx.ExecContext(ctx, fmt.Sprintf(sqlCreatePostgresSchema, tenantID))
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
+	queries.WriteString(fmt.Sprintf(sqlCreatePostgresSchema, tenantID))
+	queries.WriteString(fmt.Sprintf(sqlCreateMigrationTable, tenantID, tenantID, tenantID))
+	queries.WriteString(fmt.Sprintf(sqlGetMigrationData, tenantID))
 
-	err = tx.ExecContext(ctx, fmt.Sprintf(sqlCreateMigrationTable, tenantID, tenantID, tenantID))
-	if err != nil {
-		_ = tx.Rollback()
-		return err
-	}
-
+	// since if it frequently called, and doesn't need rollback, then use preparedCreateTable statement
 	var appliedMigrations = make([]*ModelMigration, 0)
-	err = tx.QueryContext(ctx, &appliedMigrations, fmt.Sprintf(sqlGetMigrationData, tenantID))
+	err := p.master.QueryContext(ctx, &appliedMigrations, queries.String())
 	if err != nil {
-		_ = tx.Rollback()
 		return err
 	}
 
 	if len(appliedMigrations) > len(migrations) {
-		_ = tx.Rollback()
 		return fmt.Errorf("some applied migration in database is not found in list of migration")
 	}
 
@@ -102,7 +92,6 @@ func (p postgres) Sync(ctx context.Context) error {
 	var appliedMigrationById = make(map[string]*ModelMigration)
 	for _, m := range appliedMigrations {
 		if _, exist := candidateMigration[m.ID]; !exist {
-			_ = tx.Rollback()
 			return fmt.Errorf("migration %s is not registred in migration list", m.ID)
 		}
 
@@ -124,7 +113,6 @@ func (p postgres) Sync(ctx context.Context) error {
 			// detect anomalies, when sequence number in input data is not same as order
 			// in applied migration database
 			if v.SequenceNumber != seqNum {
-				_ = tx.Rollback()
 				return fmt.Errorf(
 					"%s is registered with sequence %d but applied with sequence %d",
 					v.ID,
@@ -138,7 +126,6 @@ func (p postgres) Sync(ctx context.Context) error {
 
 		sql, err := m.Up(ctx, tenantID)
 		if err != nil {
-			_ = tx.Rollback()
 			return err
 		}
 
@@ -151,31 +138,30 @@ func (p postgres) Sync(ctx context.Context) error {
 
 	// if no migration to be synced, then early return without error
 	if len(candidateUp) <= 0 {
-		_ = tx.Commit()
 		return nil
 	}
+
+	tx := p.master
 
 	for _, m := range candidateUp {
 		err = tx.ExecContext(ctx, m.query)
 		if err != nil {
-			_ = tx.Rollback()
-			return err
+			return fmt.Errorf("error execution migration id %s: %s", m.id, err.Error())
 		}
 
 		err = tx.ExecContext(ctx, fmt.Sprintf(sqlInsertMigrationData, tenantID), m.id, m.sequenceNum)
 		if err != nil {
-			_ = tx.Rollback()
-			return err
+			return fmt.Errorf("error recording %s: %s", m.id, err.Error())
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
-func NewImmigrationPostgres(conn db.SQL, tenantId string, migration []Migrate) Immigration {
+func NewImmigrationPostgres(conn db.SQL, tenantId string, migration []Migrate) (Immigration, error) {
 	return &postgres{
 		master:    conn.Writer(),
 		tenantId:  tenantId,
 		migration: migration,
-	}
+	}, nil
 }

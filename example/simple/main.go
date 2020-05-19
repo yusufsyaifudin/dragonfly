@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"ysf/dragonfly/migration"
 	"ysf/dragonfly/pkg/db"
 	"ysf/dragonfly/tenantdb"
+	"ysf/dragonfly/tenantdb/migration"
 )
 
 // note that this program is just give you a vision about how using the API.
