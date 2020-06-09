@@ -3,37 +3,47 @@ package userhandler
 import (
 	"context"
 	"fmt"
-	"ysf/dragonfly/reply"
-	"ysf/dragonfly/server"
+	"ysf/dragonfly/processor"
 )
 
-func (h handler) registerUser(ctx context.Context, req server.Request) server.Response {
-	tenantID := req.GetParam("tenant_id")
+func (h handler) registerUser(ctx context.Context, input processor.Input) processor.Output {
+	tenantID := input.GetParam("tenant_id")
 
 	tenantDB := h.dep.TenantDB()
 	tenant, _, err := tenantDB.CreateTenant(ctx, tenantID, tenantID)
 	if err != nil {
-		return reply.Error(map[string]interface{}{
-			"error": fmt.Sprintf("error creating db connection: %s", err.Error()),
-		})
+		return processor.Output{
+			Error:      err,
+			Type:       "",
+			StatusCode: "",
+			Data:       nil,
+		}
 	}
 
-	//immigration, err := tenantDB.GetTenantImmigration(ctx, tenantID)
-	//if err != nil {
-	//	return reply.Error(map[string]interface{}{
-	//		"error": fmt.Sprintf("immigration error: %s", err.Error()),
-	//	})
-	//}
+	immigration, err := tenantDB.GetTenantImmigration(ctx, tenantID)
+	if err != nil {
+		return processor.Output{
+			Error:      fmt.Errorf("immigration error: %s", err.Error()),
+			Type:       "",
+			StatusCode: "",
+			Data:       nil,
+		}
+	}
 
-	//err = immigration.Sync(ctx)
-	//if err != nil {
-	//	return reply.Error(map[string]interface{}{
-	//		"error": fmt.Sprintf("sync error: %s", err.Error()),
-	//	})
-	//}
+	err = immigration.Sync(ctx)
+	if err != nil {
+		return processor.Output{
+			Error:      fmt.Errorf("sync error: %s", err.Error()),
+			Type:       "",
+			StatusCode: "",
+			Data:       nil,
+		}
+	}
 
-	return reply.Success(server.ReplyStructure{
-		Type: "Tenant",
-		Data: tenant,
-	})
+	return processor.Output{
+		Error:      nil,
+		Type:       "Tenant",
+		StatusCode: "",
+		Data:       tenant,
+	}
 }
