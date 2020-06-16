@@ -2,8 +2,9 @@ package tenantdb
 
 import (
 	"fmt"
-	"ysf/dragonfly/pkg/db"
-	"ysf/dragonfly/tenantdb/model"
+
+	"github.com/yusufsyaifudin/dragonfly/pkg/db"
+	"github.com/yusufsyaifudin/dragonfly/tenantdb/model"
 )
 
 type defaultConnection struct {

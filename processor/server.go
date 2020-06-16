@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
-	"ysf/dragonfly/reply"
-	"ysf/dragonfly/server"
+
+	"github.com/yusufsyaifudin/dragonfly/reply"
+	"github.com/yusufsyaifudin/dragonfly/server"
 
 	"github.com/opentracing/opentracing-go"
 )

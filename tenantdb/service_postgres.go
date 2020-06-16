@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"ysf/dragonfly/pkg/db"
-	"ysf/dragonfly/tenantdb/migration"
-	"ysf/dragonfly/tenantdb/model"
+
+	"github.com/yusufsyaifudin/dragonfly/pkg/db"
+	"github.com/yusufsyaifudin/dragonfly/tenantdb/migration"
+	"github.com/yusufsyaifudin/dragonfly/tenantdb/model"
 
 	"github.com/pkg/errors"
 

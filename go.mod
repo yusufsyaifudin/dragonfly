@@ -1,4 +1,4 @@
-module ysf/dragonfly
+module github.com/yusufsyaifudin/dragonfly
 
 go 1.14
 

@@ -2,8 +2,9 @@ package tenantdb
 
 import (
 	"context"
-	"ysf/dragonfly/tenantdb/migration"
-	"ysf/dragonfly/tenantdb/model"
+
+	"github.com/yusufsyaifudin/dragonfly/tenantdb/migration"
+	"github.com/yusufsyaifudin/dragonfly/tenantdb/model"
 )
 
 type Service interface {

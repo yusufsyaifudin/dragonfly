@@ -3,7 +3,8 @@ package tenantdb
 import (
 	"context"
 	"fmt"
-	"ysf/dragonfly/tenantdb/model"
+
+	"github.com/yusufsyaifudin/dragonfly/tenantdb/model"
 
 	"github.com/opentracing/opentracing-go"
 )
